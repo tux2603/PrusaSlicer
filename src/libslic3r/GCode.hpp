@@ -238,6 +238,8 @@ private:
         bool        spiral_vase_enable { false };
         // Should the cooling buffer content be flushed at the end of this layer?
         bool        cooling_buffer_flush { false };
+        // Should the PressureEqualizer buffer content be flushed at the end of this layer?
+        bool        pressure_equalizer_buffer_flush { false };
     };
     LayerResult process_layer(
         const Print                     &print,
