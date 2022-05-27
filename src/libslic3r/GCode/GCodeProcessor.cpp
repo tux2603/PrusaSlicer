@@ -889,7 +889,7 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
 
     // With MM setups like Prusa MMU2, the filaments may be expected to be parked at the beginning.
     // Remember the parking position so the initial load is not included in filament estimate.
-    if (config.single_extruder_multi_material && extruders_count > 1) {
+    if (config.single_extruder_multi_material && extruders_count > 1 && config.wipe_tower) {
         m_parking_position = float(config.parking_pos_retraction.value);
         m_extra_loading_move = float(config.extra_loading_move);
     }
