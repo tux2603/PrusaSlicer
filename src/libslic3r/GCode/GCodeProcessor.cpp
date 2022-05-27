@@ -663,10 +663,15 @@ void GCodeProcessor::UsedFilaments::reset()
     extruder_retracted_volume.clear();
 }
 
-void GCodeProcessor::UsedFilaments::increase_caches(double extruded_volume, unsigned char extruder_id, double parking_volume)
+void GCodeProcessor::UsedFilaments::increase_caches(double extruded_volume, unsigned char extruder_id, double parking_volume, double extra_loading_volume)
 {
     if (extruder_id >= extruder_retracted_volume.size())
         extruder_retracted_volume.resize(extruder_id + 1, parking_volume);
+    
+    if (recent_toolchange) {
+        extruded_volume -= extra_loading_volume;
+        recent_toolchange = false;
+    }
     
     extruder_retracted_volume[extruder_id] -= extruded_volume;
 
@@ -693,7 +698,8 @@ void GCodeProcessor::UsedFilaments::process_extruder_cache(unsigned char extrude
     if (tool_change_cache != 0.0) {
         volumes_per_extruder[extruder_id] += tool_change_cache;
          tool_change_cache = 0.0;
-     }
+    }
+    recent_toolchange = true;
  }
 
 void GCodeProcessor::UsedFilaments::process_role_cache(const GCodeProcessor* processor)
@@ -883,8 +889,10 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
 
     // With MM setups like Prusa MMU2, the filaments may be expected to be parked at the beginning.
     // Remember the parking position so the initial load is not included in filament estimate.
-    if (config.single_extruder_multi_material && extruders_count > 1)
+    if (config.single_extruder_multi_material && extruders_count > 1) {
         m_parking_position = float(config.parking_pos_retraction.value);
+        m_extra_loading_move = float(config.extra_loading_move);
+    }
 
     for (size_t i = 0; i < static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count); ++i) {
         float max_acceleration = get_option_value(m_time_processor.machine_limits.machine_max_acceleration_extruding, i);
@@ -1219,6 +1227,7 @@ void GCodeProcessor::reset()
     }
 
     m_parking_position = 0.f;
+    m_extra_loading_move = 0.f;
     m_extruded_last_z = 0.0f;
     m_first_layer_height = 0.0f;
     m_processing_start_custom_gcode = false;
@@ -2497,7 +2506,9 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
     const float volume_extruded_filament = area_filament_cross_section * delta_pos[E];
 
     if (volume_extruded_filament != 0.)
-        m_used_filaments.increase_caches(volume_extruded_filament, this->m_extruder_id, area_filament_cross_section * this->m_parking_position);
+        m_used_filaments.increase_caches(volume_extruded_filament,
+            this->m_extruder_id, area_filament_cross_section * this->m_parking_position,
+            area_filament_cross_section * this->m_extra_loading_move);
 
     EMoveType type = move_type(delta_pos);
     if (type == EMoveType::Extrude) {

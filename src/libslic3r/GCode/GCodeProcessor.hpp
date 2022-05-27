@@ -361,7 +361,7 @@ namespace Slic3r {
 
             void reset();
 
-            void increase_caches(double extruded_volume, unsigned char extruder_id, double parking_volume);
+            void increase_caches(double extruded_volume, unsigned char extruder_id, double parking_volume, double extra_loading_volume);
 
             void process_color_change_cache();
             void process_extruder_cache(unsigned char extruder_id);
@@ -369,6 +369,7 @@ namespace Slic3r {
             void process_caches(const GCodeProcessor* processor);
        private:
             std::vector<double> extruder_retracted_volume;
+            bool recent_toolchange = false;
         };
 
     public:
@@ -530,6 +531,7 @@ namespace Slic3r {
         ExtruderColors m_extruder_colors;
         ExtruderTemps m_extruder_temps;
         float m_parking_position;
+        float m_extra_loading_move;
         float m_extruded_last_z;
         float m_first_layer_height; // mm
         bool m_processing_start_custom_gcode;
