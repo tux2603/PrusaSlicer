@@ -8,6 +8,7 @@
 
 #include "libslic3r/Geometry/ConvexHull.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/SurfaceMesh.hpp"
 
 #include <numeric>
 
@@ -229,46 +230,44 @@ void GLGizmoMeasure::update_planes()
     // This part is still performed in mesh coordinate system.
     const int                num_of_facets  = ch.facets_count();
     const std::vector<Vec3f> face_normals   = its_face_normals(ch.its);
-    const std::vector<Vec3i> face_neighbors = its_face_neighbors(ch.its);
-    std::vector<int>         facet_queue(num_of_facets, 0);
-    std::vector<bool>        facet_visited(num_of_facets, false);
-    int                      facet_queue_cnt = 0;
-    const stl_normal*        normal_ptr      = nullptr;
-    int facet_idx = 0;
-    while (1) {
-        // Find next unvisited triangle:
-        for (; facet_idx < num_of_facets; ++ facet_idx)
-            if (!facet_visited[facet_idx]) {
-                facet_queue[facet_queue_cnt ++] = facet_idx;
-                facet_visited[facet_idx] = true;
-                normal_ptr = &face_normals[facet_idx];
-                m_planes.emplace_back();
-                break;
-            }
-        if (facet_idx == num_of_facets)
-            break; // Everything was visited already
+    std::vector<bool> facet_visited(num_of_facets, false);
+    std::vector<int> facet_queue;
+    facet_queue.reserve(512);
+    const SurfaceMesh sm(ch.its);
 
-        while (facet_queue_cnt > 0) {
-            int facet_idx = facet_queue[-- facet_queue_cnt];
-            const stl_normal& this_normal = face_normals[facet_idx];
-            if (std::abs(this_normal(0) - (*normal_ptr)(0)) < 0.001 && std::abs(this_normal(1) - (*normal_ptr)(1)) < 0.001 && std::abs(this_normal(2) - (*normal_ptr)(2)) < 0.001) {
-                const Vec3i face = ch.its.indices[facet_idx];
-                for (int j=0; j<3; ++j)
-                    m_planes.back().vertices.emplace_back(ch.its.vertices[face[j]].cast<double>());
+    Halfedge_index hi = sm.halfedge(Face_index(0));
+    const Vec3f& current_normal = face_normals[int(hi.face())];
+    facet_queue.emplace_back(int(hi.face()));
 
-                facet_visited[facet_idx] = true;
-                for (int j = 0; j < 3; ++ j)
-                    if (int neighbor_idx = face_neighbors[facet_idx][j]; neighbor_idx >= 0 && ! facet_visited[neighbor_idx])
-                        facet_queue[facet_queue_cnt ++] = neighbor_idx;
-            }
+    size_t face_cnt = 0;
+    while (face_cnt < facet_queue.size()) {
+        facet_visited[int(hi.face())] = true;
+        ++face_cnt;
+
+        if (! current_normal.isApprox(face_normals[int(hi.face())])) {
+            // We just passed an edge of the plane we work with.
+            
+
+            continue; // Do not add the neighbors to the queue.
         }
-        m_planes.back().normal = normal_ptr->cast<double>();
 
-        Pointf3s& verts = m_planes.back().vertices;
-        // Now we'll transform all the points into world coordinates, so that the areas, angles and distances
-        // make real sense.
-        verts = transform(verts, inst_matrix);
+        Vec3i neighbors = sm.get_face_neighbors(hi.face());
+        for (int i=0; i<3; ++i)
+            if (! facet_visited[neighbors[i]])
+                facet_queue.emplace_back(neighbors[i]);
     }
+    
+
+
+
+
+
+   // while (1) {
+   //     Pointf3s& verts = m_planes.back().vertices;
+   //     // Now we'll transform all the points into world coordinates, so that the areas, angles and distances
+   //     // make real sense.
+   //     verts = transform(verts, inst_matrix);
+   // }
 
     // Let's prepare transformation of the normal vector from mesh to instance coordinates.
     Geometry::Transformation t(inst_matrix);
