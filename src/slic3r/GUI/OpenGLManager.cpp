@@ -241,7 +241,13 @@ bool OpenGLManager::init_gl()
         std::cout << "init_gl() in" << std::endl;
         glewExperimental = GL_TRUE;
         GLenum err = glewInit();
-        if (err != GLEW_OK) {
+        if (err != GLEW_ERROR_NO_GLX_DISPLAY) {
+            // Don't recognize the GLEW_ERROR_NO_GLX_DISPLAY as a real error in glew init
+            // see https://github.com/nigels-com/glew/issues/273
+            // Just log it
+            BOOST_LOG_TRIVIAL(error) << "init glew library: GLEW_ERROR_NO_GLX_DISPLAY";
+        }
+        else if (err != GLEW_OK) {
             BOOST_LOG_TRIVIAL(error) << "Unable to init glew library: " << glewGetErrorString(err);
             return false;
         }
